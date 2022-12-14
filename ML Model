@@ -1,0 +1,99 @@
+import pandas as pd
+import numpy as np
+from scipy.sparse import csr_matrix
+from sklearn.neighbors import NearestNeighbors
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+#Reading of the files
+food = pd.read_csv("food.csv")
+ratings = pd.read_csv("ratings.csv")
+
+food.shape
+ratings.shape
+
+#done pivot table --> does groupby on col and specifies agg matrix on cols
+dataset = ratings.pivot_table(index='Food_ID', columns='User_ID', values='Rating')
+dataset.fillna(0, inplace=True)
+
+dataset
+#User Item Matrix
+
+with sns.axes_style('white'):
+    g = sns.factorplot("Rating", data=ratings, aspect=2.0,kind='count')
+    g.set_ylabels("Total number of ratings")
+    
+dataset.describe()[1:].T.style.background_gradient(cmap='Blues')
+
+with sns.axes_style('white'):
+    g = sns.factorplot("Veg_Non", data=food, aspect=2.0,kind='count')
+    g.set_ylabels("No of delicacies")
+    
+import plotly.express as px
+fig = px.scatter(ratings, x="Rating", y="Food_ID", color=ratings['Rating'],  color_continuous_scale='Reds')
+fig.update_layout(legend_title_text='Rating')
+
+#main recommendation function
+def food_recommendation(Food_Name):
+    n = 10
+    FoodList = food[food['Name'].str.contains(Food_Name)]  
+    if len(FoodList):        
+        Foodi= FoodList.iloc[0]['Food_ID']
+        Foodi = dataset[dataset['Food_ID'] == Foodi].index[0]
+        distances , indices = model.kneighbors(csr_dataset[Foodi],n_neighbors=n+1)    
+        Food_indices = sorted(list(zip(indices.squeeze().tolist(),distances.squeeze().tolist())),key=lambda x: x[1])[:0:-1]
+        Recommendations = []
+        for val in Food_indices:
+            Foodi = dataset.iloc[val[0]]['Food_ID']
+            i = food[food['Food_ID'] == Foodi].index
+            Recommendations.append({'Name':food.iloc[i]['Name'].values[0],'Distance':val[1]})
+
+        import pandas as pd    
+        df = pd.DataFrame(Recommendations,index=range(1,n+1))
+        return df['Name']
+    else:
+        return "No Similar Foods."
+    
+#remove sparsity
+csr_dataset = csr_matrix(dataset.values)
+dataset.reset_index(inplace = True)
+
+#using algorithm
+model = NearestNeighbors(metric='cosine', algorithm='brute', n_neighbors=20, n_jobs=-1)
+model.fit(csr_dataset)
+
+food_recommendation('dates and nuts ladoo')
+
+#SVD (SINGLE VALUE DECOMPOSITION) ALGO
+from scipy.sparse.linalg import svds
+# Singular Value Decomposition
+U, sigma, Vt = svds(dataset, k = 50)
+# Construct diagonal array in SVD
+sigma = np.diag(sigma)
+all_user_predicted_ratings = np.dot(np.dot(U, sigma), Vt) 
+
+# Predicted ratings
+preds_df = pd.DataFrame(all_user_predicted_ratings, columns = dataset.columns)
+preds_df.head()
+# Recommend the items with the highest predicted ratings
+
+def recommend_items(userID, pivot_df, preds_df, num_recommendations):
+      
+    user_idx = userID-1 # index starts at 0
+    
+    # Get and sort the user's ratings
+    sorted_user_ratings = pivot_df.iloc[user_idx].sort_values(ascending=False)
+    #sorted_user_ratings
+    sorted_user_predictions = preds_df.iloc[user_idx].sort_values(ascending=False)
+    #sorted_user_predictions
+
+    temp = pd.concat([sorted_user_ratings, sorted_user_predic])
+    
+rmse_df = pd.concat([train_data.mean(), test_data.mean()], axis=1)
+rmse_df.columns = ['Avg_actual_ratings', 'Avg_predicted_ratings']
+print(rmse_df.shape)
+rmse_df['item_index'] = np.arange(0, rmse_df.shape[0], 1)
+rmse_df.head()
+
+RMSE = round((((rmse_df.Avg_actual_ratings - rmse_df.Avg_predicted_ratings) ** 2).mean() ** 0.5), 5)
+print('\nRMSE KNN Model = {} \n'.format(RMSE))
